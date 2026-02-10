@@ -9,7 +9,8 @@ import Tareas from './components/Tareas';
 import Pomodoro from './components/Pomodoro';
 import Recursos from './components/Recursos';
 
-const APP_VERSION = "0.0.1";
+// ACTUALIZACIÓN A V0.0.2: Responsive + Persistencia
+const APP_VERSION = "0.0.2";
 
 const TEMAS = {
   classic: { bg: '#f8fafc', accent: '#2563eb', card: '#ffffff', text: '#0f172a', nav: 'rgba(255,255,255,0.7)', secondary: '#64748b' },
@@ -30,7 +31,6 @@ const FUENTES = {
   rounded: '"Quicksand", sans-serif'
 };
 
-// Hook para detectar si es móvil
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   useEffect(() => {
@@ -85,8 +85,6 @@ const Home = ({ perfil, tareas, parciales, asignaturas, tema, isMobile }) => {
 
   return (
     <div style={{ padding: isMobile ? '20px 15px' : '40px 20px', maxWidth: '1200px', margin: '0 auto' }}>
-      
-      {/* SECCIÓN RADAR */}
       <div style={{ marginBottom: isMobile ? '25px' : '40px' }}>
         {claseActual ? (
           <div style={{ background: tema.accent + '15', padding: isMobile ? '20px' : '30px', borderRadius: '35px', border: `1px solid ${tema.accent}30` }}>
@@ -104,10 +102,10 @@ const Home = ({ perfil, tareas, parciales, asignaturas, tema, isMobile }) => {
           </div>
         ) : (
           <div style={{ background: tema.card, padding: '15px 25px', borderRadius: '25px', border: `1px solid ${tema.accent}20`, display: 'flex', alignItems: 'center', gap: '12px' }}>
-             <Clock size={18} color={tema.accent}/>
-             <span style={{ fontSize: '14px', fontWeight: '700', color: tema.secondary }}>
-                {siguienteClase ? `Siguiente: ${siguienteClase.nombre} a las ${siguienteClase.hora_inicio}` : 'No hay más clases por hoy'}
-             </span>
+              <Clock size={18} color={tema.accent}/>
+              <span style={{ fontSize: '14px', fontWeight: '700', color: tema.secondary }}>
+                 {siguienteClase ? `Siguiente: ${siguienteClase.nombre} a las ${siguienteClase.hora_inicio}` : 'No hay más clases por hoy'}
+              </span>
           </div>
         )}
       </div>
@@ -118,13 +116,7 @@ const Home = ({ perfil, tareas, parciales, asignaturas, tema, isMobile }) => {
         </h1>
       </header>
 
-      {/* GRID DE TARJETAS RESPONSIVO */}
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(320px, 1fr))', 
-        gap: '20px' 
-      }}>
-        {/* HORARIO */}
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
         <div style={cardStyle}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', color: tema.accent }}>
             <BookOpen size={20}/>
@@ -138,7 +130,6 @@ const Home = ({ perfil, tareas, parciales, asignaturas, tema, isMobile }) => {
           )) : <p style={{ color: tema.secondary, fontSize: '13px' }}>Día libre.</p>}
         </div>
 
-        {/* TAREAS */}
         <div style={{ ...cardStyle, background: tema.bg === '#000000' ? '#111827' : '#0f172a', color: 'white' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', color: '#f87171' }}>
             <AlertCircle size={20}/>
@@ -152,7 +143,6 @@ const Home = ({ perfil, tareas, parciales, asignaturas, tema, isMobile }) => {
           ))}
         </div>
 
-        {/* EXÁMENES */}
         <div style={cardStyle}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', color: '#f59e0b' }}>
             <Calendar size={20}/>
@@ -173,7 +163,13 @@ const Home = ({ perfil, tareas, parciales, asignaturas, tema, isMobile }) => {
 function App() {
   const isMobile = useIsMobile();
   const [session, setSession] = useState(null);
-  const [perfil, setPerfil] = useState({ tema: 'classic', fuente: 'sans' });
+  
+  // v0.0.2: Carga inicial desde localStorage para evitar saltos visuales
+  const [perfil, setPerfil] = useState(() => {
+    const saved = localStorage.getItem('unicore_prefs');
+    return saved ? JSON.parse(saved) : { tema: 'classic', fuente: 'sans' };
+  });
+
   const [loading, setLoading] = useState(true);
   const [showConfig, setShowConfig] = useState(false);
   const [editNombre, setEditNombre] = useState('');
@@ -213,6 +209,8 @@ function App() {
     if (pRef.data) {
       setPerfil(pRef.data);
       setEditNombre(pRef.data.nombre_preferido || '');
+      // Sincronizar localmente lo que viene de la DB
+      localStorage.setItem('unicore_prefs', JSON.stringify(pRef.data));
     }
     if (tRes.data) setTareas(tRes.data);
     if (pRes.data) setParciales(pRes.data);
@@ -223,6 +221,11 @@ function App() {
   const actualizarPreferencia = async (campo, valor) => {
     const nuevoPerfil = { ...perfil, [campo]: valor };
     setPerfil(nuevoPerfil);
+    
+    // v0.0.2: Persistencia local inmediata
+    localStorage.setItem('unicore_prefs', JSON.stringify(nuevoPerfil));
+    
+    // Persistencia en DB
     await supabase.from('perfiles').upsert({ id: session.user.id, ...nuevoPerfil });
   };
 
@@ -239,8 +242,6 @@ function App() {
   return (
     <Router>
       <div style={{ minHeight: '100vh', backgroundColor: temaActual.bg, color: temaActual.text, fontFamily: fuenteActual, transition: 'all 0.4s ease' }}>
-        
-        {/* NAVEGACIÓN RESPONSIVA */}
         <nav style={{ 
           position: 'fixed', top: isMobile ? '10px' : '30px', left: '50%', transform: 'translateX(-50%)',
           width: isMobile ? '92%' : '95%', maxWidth: '1200px', backgroundColor: temaActual.nav,
@@ -266,30 +267,28 @@ function App() {
             </div>
           ) : (
             <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-               <button onClick={() => setMenuOpen(!menuOpen)} style={{ border: 'none', background: 'none', color: temaActual.text }}><Menu size={24}/></button>
+                <button onClick={() => setMenuOpen(!menuOpen)} style={{ border: 'none', background: 'none', color: temaActual.text }}><Menu size={24}/></button>
             </div>
           )}
 
-          {/* MENÚ MÓVIL (OVERLAY) */}
           {isMobile && menuOpen && (
             <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100vh', background: temaActual.bg, zIndex: 2000, padding: '30px', boxSizing: 'border-box' }}>
-               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '40px' }}>
-                  <span style={{ fontWeight: '900', color: temaActual.accent }}>MENÚ</span>
-                  <button onClick={() => setMenuOpen(false)} style={{ border: 'none', background: 'none', color: temaActual.text }}><X size={28}/></button>
-               </div>
-               <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
-                  {navLinks.map(link => (
-                    <Link key={link.path} to={link.path} onClick={() => setMenuOpen(false)} style={{ textDecoration: 'none', color: temaActual.text, fontSize: '24px', fontWeight: '900' }}>{link.name}</Link>
-                  ))}
-                  <Link to="/recursos" onClick={() => setMenuOpen(false)} style={{ textDecoration: 'none', color: temaActual.accent, fontSize: '24px', fontWeight: '900' }}>Recursos</Link>
-                  <hr style={{ width: '100%', border: `1px solid ${temaActual.accent}20` }}/>
-                  <button onClick={() => { setShowConfig(true); setMenuOpen(false); }} style={{ textAlign: 'left', border: 'none', background: 'none', color: temaActual.text, fontSize: '20px', fontWeight: '700' }}>Ajustes</button>
-                  <button onClick={() => supabase.auth.signOut()} style={{ textAlign: 'left', border: 'none', background: 'none', color: '#f87171', fontSize: '20px', fontWeight: '700' }}>Cerrar Sesión</button>
-               </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '40px' }}>
+                   <span style={{ fontWeight: '900', color: temaActual.accent }}>MENÚ</span>
+                   <button onClick={() => setMenuOpen(false)} style={{ border: 'none', background: 'none', color: temaActual.text }}><X size={28}/></button>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
+                   {navLinks.map(link => (
+                     <Link key={link.path} to={link.path} onClick={() => setMenuOpen(false)} style={{ textDecoration: 'none', color: temaActual.text, fontSize: '24px', fontWeight: '900' }}>{link.name}</Link>
+                   ))}
+                   <Link to="/recursos" onClick={() => setMenuOpen(false)} style={{ textDecoration: 'none', color: temaActual.accent, fontSize: '24px', fontWeight: '900' }}>Recursos</Link>
+                   <hr style={{ width: '100%', border: `1px solid ${temaActual.accent}20` }}/>
+                   <button onClick={() => { setShowConfig(true); setMenuOpen(false); }} style={{ textAlign: 'left', border: 'none', background: 'none', color: temaActual.text, fontSize: '20px', fontWeight: '700' }}>Ajustes</button>
+                   <button onClick={() => supabase.auth.signOut()} style={{ textAlign: 'left', border: 'none', background: 'none', color: '#f87171', fontSize: '20px', fontWeight: '700' }}>Cerrar Sesión</button>
+                </div>
             </div>
           )}
           
-          {/* PANEL CONFIGURACIÓN */}
           {showConfig && (
             <div style={{ position: 'absolute', top: isMobile ? '60px' : '80px', right: isMobile ? '4%' : '40px', background: temaActual.card, padding: '25px', borderRadius: '30px', boxShadow: '0 20px 50px rgba(0,0,0,0.1)', border: `1px solid ${temaActual.accent}20`, width: isMobile ? '92%' : '300px', zIndex: 1001, boxSizing: 'border-box' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
@@ -331,7 +330,7 @@ function App() {
         </main>
 
         <footer style={{ padding: '30px 20px', textAlign: 'center', color: temaActual.secondary, fontSize: '10px', fontWeight: '800' }}>
-          UNI CORE v{APP_VERSION}
+          UNI CORE — v{APP_VERSION}
         </footer>
       </div>
     </Router>

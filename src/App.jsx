@@ -9,8 +9,8 @@ import Tareas from './components/Tareas';
 import Pomodoro from './components/Pomodoro';
 import Recursos from './components/Recursos';
 
-// v0.0.3: Contraste Adaptativo + Orden de Funciones (Fix ESLint) + Persistencia Real
-const APP_VERSION = "0.0.3";
+// v0.0.4: Eliminación total de Hardcode + Inyección de Temas a Subcomponentes
+const APP_VERSION = "0.0.4";
 
 const TEMAS = {
   classic: { bg: '#f8fafc', accent: '#2563eb', card: '#ffffff', text: '#0f172a', nav: 'rgba(255,255,255,0.7)', secondary: '#64748b' },
@@ -90,13 +90,13 @@ const Home = ({ perfil, tareas, parciales, asignaturas, tema, isMobile }) => {
           <div style={{ background: tema.accent + '20', padding: isMobile ? '20px' : '30px', borderRadius: '35px', border: `1px solid ${tema.accent}50` }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '15px' }}>
               <div>
-                <span style={{ fontSize: '10px', fontWeight: '900', color: tema.accent, background: tema.accent + '30', padding: '4px 10px', borderRadius: '8px', textTransform: 'uppercase' }}>En curso</span>
+                <span style={{ fontSize: '10px', fontWeight: '900', color: tema.bg, background: tema.accent, padding: '4px 10px', borderRadius: '8px', textTransform: 'uppercase' }}>En curso</span>
                 <h2 style={{ fontSize: isMobile ? '20px' : '28px', fontWeight: '900', color: tema.text, margin: '8px 0 4px 0' }}>{claseActual.nombre}</h2>
                 <p style={{ margin: 0, fontSize: '13px', color: tema.text, opacity: 0.8, fontWeight: '700' }}>Aula {claseActual.aula} • Termina {claseActual.hora_fin}</p>
               </div>
               <div style={{ fontSize: isMobile ? '24px' : '32px', fontWeight: '900', color: tema.accent }}>{obtenerProgresoClase(claseActual.hora_inicio, claseActual.hora_fin)}%</div>
             </div>
-            <div style={{ width: '100%', background: tema.accent + '25', height: '10px', borderRadius: '20px', overflow: 'hidden' }}>
+            <div style={{ width: '100%', background: tema.accent + '30', height: '10px', borderRadius: '20px', overflow: 'hidden' }}>
               <div style={{ width: `${obtenerProgresoClase(claseActual.hora_inicio, claseActual.hora_fin)}%`, background: tema.accent, height: '100%', borderRadius: '20px', transition: 'width 1s ease' }}></div>
             </div>
           </div>
@@ -130,26 +130,26 @@ const Home = ({ perfil, tareas, parciales, asignaturas, tema, isMobile }) => {
           )) : <p style={{ color: tema.text, opacity: 0.6, fontSize: '13px' }}>Día libre.</p>}
         </div>
 
-        <div style={{ ...cardStyle, background: tema.bg === '#000000' ? '#111827' : '#0f172a', color: '#ffffff', border: `1px solid ${tema.accent}50` }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', color: '#f87171' }}>
+        <div style={{ ...cardStyle, background: tema.card, border: `1px solid ${tema.accent}50` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', color: tema.accent }}>
             <AlertCircle size={20}/>
-            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '900', textTransform: 'uppercase', color: '#f87171' }}>Pendientes</h3>
+            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '900', textTransform: 'uppercase' }}>Pendientes</h3>
           </div>
           {urgentes.map((t, i) => (
-            <div key={i} style={{ padding: '12px', background: 'rgba(255,255,255,0.1)', borderRadius: '15px', marginBottom: '8px', border: '1px solid rgba(255,255,255,0.15)' }}>
-              <div style={{ fontWeight: '700', fontSize: '14px', color: '#ffffff' }}>{t.titulo}</div>
-              <div style={{ fontSize: '10px', color: '#cbd5e1' }}>{new Date(t.fecha_entrega).toLocaleDateString()}</div>
+            <div key={i} style={{ padding: '12px', background: tema.accent + '10', borderRadius: '15px', marginBottom: '8px', border: `1px solid ${tema.accent}20` }}>
+              <div style={{ fontWeight: '700', fontSize: '14px', color: tema.text }}>{t.titulo}</div>
+              <div style={{ fontSize: '10px', color: tema.text, opacity: 0.6 }}>{new Date(t.fecha_entrega).toLocaleDateString()}</div>
             </div>
           ))}
         </div>
 
         <div style={cardStyle}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', color: '#f59e0b' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', color: tema.accent }}>
             <Calendar size={20}/>
-            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '900', textTransform: 'uppercase', color: '#f59e0b' }}>Exámenes</h3>
+            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '900', textTransform: 'uppercase' }}>Exámenes</h3>
           </div>
           {proximosParciales.map((p, i) => (
-            <div key={i} style={{ padding: '12px', background: tema.accent + '15', borderRadius: '15px', marginBottom: '8px', border: `1px solid ${tema.accent}30`, color: tema.text }}>
+            <div key={i} style={{ padding: '12px', background: tema.accent + '10', borderRadius: '15px', marginBottom: '8px', border: `1px solid ${tema.accent}20`, color: tema.text }}>
               <div style={{ fontWeight: '800', fontSize: '14px' }}>{p.materia}</div>
               <div style={{ fontSize: '11px', opacity: 0.8 }}>{new Date(p.fecha).toLocaleDateString()}</div>
             </div>
@@ -171,7 +171,6 @@ function App() {
   const [asignaturas, setAsignaturas] = useState([]);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // v0.0.3: PRIORIDAD AL LOCALSTORAGE PARA EVITAR RESET AL RECARGAR
   const [perfil, setPerfil] = useState(() => {
     const saved = localStorage.getItem('unicore_prefs');
     return saved ? JSON.parse(saved) : { tema: 'classic', fuente: 'sans' };
@@ -180,12 +179,15 @@ function App() {
   const temaActual = TEMAS[perfil?.tema] || TEMAS.classic;
   const fuenteActual = FUENTES[perfil?.fuente] || FUENTES.sans;
 
-  // --- SOLUCIÓN ESLINT: DEFINIR CARGAR TODO ANTES DE LOS EFECTOS ---
   const cargarTodo = async (userId) => {
     const { data: pData } = await supabase.from('perfiles').select('*').eq('id', userId).single();
     
     if (pData) {
-      setPerfil(pData);
+      setPerfil(prev => ({
+        ...pData,
+        tema: prev.tema, 
+        fuente: prev.fuente
+      }));
       setEditNombre(pData.nombre_preferido || '');
       localStorage.setItem('unicore_prefs', JSON.stringify(pData));
     }
@@ -223,15 +225,10 @@ function App() {
   const actualizarPreferencia = async (campo, valor) => {
     const nuevoPerfil = { ...perfil, [campo]: valor };
     setPerfil(nuevoPerfil);
-    
-    // Guardado persistente inmediato
     localStorage.setItem('unicore_prefs', JSON.stringify(nuevoPerfil));
-    
-    await supabase.from('perfiles').upsert({ 
-      id: session.user.id, 
-      ...nuevoPerfil,
-      updated_at: new Date() 
-    });
+    if (session) {
+      await supabase.from('perfiles').upsert({ id: session.user.id, ...nuevoPerfil, updated_at: new Date() });
+    }
   };
 
   if (loading) return null;
@@ -246,20 +243,14 @@ function App() {
 
   return (
     <Router>
-      <div style={{ 
-        minHeight: '100vh', 
-        backgroundColor: temaActual.bg, 
-        color: temaActual.text, 
-        fontFamily: fuenteActual, 
-        transition: 'all 0.4s ease' 
-      }}>
+      <div style={{ minHeight: '100vh', backgroundColor: temaActual.bg, color: temaActual.text, fontFamily: fuenteActual, transition: 'all 0.4s ease' }}>
         
         <nav style={{ 
           position: 'fixed', top: isMobile ? '10px' : '30px', left: '50%', transform: 'translateX(-50%)',
           width: isMobile ? '92%' : '95%', maxWidth: '1200px', backgroundColor: temaActual.nav,
           backdropFilter: 'blur(20px)', borderRadius: isMobile ? '20px' : '35px', padding: isMobile ? '10px 20px' : '15px 45px',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          boxShadow: '0 15px 35px rgba(0,0,0,0.1)', zIndex: 1000, border: `1px solid ${temaActual.accent}50`,
+          boxShadow: '0 15px 35px rgba(0,0,0,0.15)', zIndex: 1000, border: `1px solid ${temaActual.accent}60`,
           boxSizing: 'border-box'
         }}>
           <Link to="/" style={{ textDecoration: 'none', fontSize: isMobile ? '18px' : '22px', fontWeight: '900', color: temaActual.text }}>
@@ -302,27 +293,27 @@ function App() {
           )}
           
           {showConfig && (
-            <div style={{ position: 'absolute', top: isMobile ? '60px' : '80px', right: isMobile ? '4%' : '40px', background: temaActual.card, padding: '25px', borderRadius: '30px', boxShadow: '0 20px 50px rgba(0,0,0,0.2)', border: `1px solid ${temaActual.accent}40`, width: isMobile ? '92%' : '300px', zIndex: 1001, boxSizing: 'border-box' }}>
+            <div style={{ position: 'absolute', top: isMobile ? '60px' : '80px', right: isMobile ? '4%' : '40px', background: temaActual.card, padding: '25px', borderRadius: '30px', boxShadow: '0 20px 50px rgba(0,0,0,0.3)', border: `1px solid ${temaActual.accent}50`, width: isMobile ? '92%' : '300px', zIndex: 1001, boxSizing: 'border-box' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
                 <h4 style={{ margin: 0, fontSize: '12px', fontWeight: '900', color: temaActual.accent }}>AJUSTES</h4>
                 <button onClick={() => setShowConfig(false)} style={{ border: 'none', background: 'none', color: temaActual.text, opacity: 0.5 }}><X size={16}/></button>
               </div>
               <div style={{ marginBottom: '15px' }}>
-                <label style={{ fontSize: '10px', fontWeight: '900', color: temaActual.text, opacity: 0.6, display: 'block', marginBottom: '5px' }}>NOMBRE</label>
+                <label style={{ fontSize: '10px', fontWeight: '900', color: temaActual.text, opacity: 0.7, display: 'block', marginBottom: '5px' }}>NOMBRE</label>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <input style={{ flex: 1, padding: '8px', borderRadius: '10px', border: `1px solid ${temaActual.accent}40`, background: temaActual.bg, color: temaActual.text, fontSize: '12px' }} value={editNombre} onChange={(e) => setEditNombre(e.target.value)} />
-                  <button onClick={() => actualizarPreferencia('nombre_preferido', editNombre)} style={{ background: temaActual.accent, color: temaActual.bg, border: 'none', borderRadius: '10px', padding: '8px', cursor: 'pointer' }}><Check size={14}/></button>
+                  <input style={{ flex: 1, padding: '8px', borderRadius: '10px', border: `1px solid ${temaActual.accent}50`, background: temaActual.bg, color: temaActual.text, fontSize: '12px' }} value={editNombre} onChange={(e) => setEditNombre(e.target.value)} />
+                  <button onClick={() => actualizarPreferencia('nombre_preferido', editNombre)} style={{ background: temaActual.accent, color: temaActual.bg, border: 'none', borderRadius: '10px', padding: '8px', cursor: 'pointer', fontWeight: '800' }}><Check size={14}/></button>
                 </div>
               </div>
               <div style={{ marginBottom: '15px' }}>
-                <label style={{ fontSize: '10px', fontWeight: '900', color: temaActual.text, opacity: 0.6, display: 'block', marginBottom: '5px' }}>TEMA</label>
-                <select style={{ width: '100%', padding: '8px', borderRadius: '10px', background: temaActual.bg, color: temaActual.text, border: `1px solid ${temaActual.accent}40` }} value={perfil.tema} onChange={(e) => actualizarPreferencia('tema', e.target.value)}>
+                <label style={{ fontSize: '10px', fontWeight: '900', color: temaActual.text, opacity: 0.7, display: 'block', marginBottom: '5px' }}>TEMA</label>
+                <select style={{ width: '100%', padding: '8px', borderRadius: '10px', background: temaActual.bg, color: temaActual.text, border: `1px solid ${temaActual.accent}50` }} value={perfil.tema} onChange={(e) => actualizarPreferencia('tema', e.target.value)}>
                   {Object.keys(TEMAS).map(t => <option key={t} value={t}>{t.toUpperCase()}</option>)}
                 </select>
               </div>
               <div style={{ marginBottom: '15px' }}>
-                <label style={{ fontSize: '10px', fontWeight: '900', color: temaActual.text, opacity: 0.6, display: 'block', marginBottom: '5px' }}>FUENTE</label>
-                <select style={{ width: '100%', padding: '8px', borderRadius: '10px', background: temaActual.bg, color: temaActual.text, border: `1px solid ${temaActual.accent}40` }} value={perfil.fuente} onChange={(e) => actualizarPreferencia('fuente', e.target.value)}>
+                <label style={{ fontSize: '10px', fontWeight: '900', color: temaActual.text, opacity: 0.7, display: 'block', marginBottom: '5px' }}>FUENTE</label>
+                <select style={{ width: '100%', padding: '8px', borderRadius: '10px', background: temaActual.bg, color: temaActual.text, border: `1px solid ${temaActual.accent}50` }} value={perfil.fuente} onChange={(e) => actualizarPreferencia('fuente', e.target.value)}>
                   {Object.keys(FUENTES).map(f => <option key={f} value={f}>{f.toUpperCase()}</option>)}
                 </select>
               </div>
@@ -333,15 +324,15 @@ function App() {
         <main style={{ flex: 1, paddingTop: isMobile ? '100px' : '160px' }}>
           <Routes>
             <Route path="/" element={<Home perfil={perfil} tareas={tareas} parciales={parciales} asignaturas={asignaturas} tema={temaActual} isMobile={isMobile} />} />
-            <Route path="/horario" element={<Horario />} />
-            <Route path="/tareas" element={<Tareas />} />
-            <Route path="/finanzas" element={<Finanzas />} />
-            <Route path="/pomodoro" element={<Pomodoro />} />
-            <Route path="/recursos" element={<Recursos session={session} />} />
+            <Route path="/horario" element={<Horario tema={temaActual} isMobile={isMobile} />} />
+            <Route path="/tareas" element={<Tareas tema={temaActual} isMobile={isMobile} />} />
+            <Route path="/finanzas" element={<Finanzas tema={temaActual} isMobile={isMobile} />} />
+            <Route path="/pomodoro" element={<Pomodoro tema={temaActual} isMobile={isMobile} />} />
+            <Route path="/recursos" element={<Recursos session={session} tema={temaActual} isMobile={isMobile} />} />
           </Routes>
         </main>
 
-        <footer style={{ padding: '30px 20px', textAlign: 'center', color: temaActual.text, opacity: 0.5, fontSize: '10px', fontWeight: '800' }}>
+        <footer style={{ padding: '30px 20px', textAlign: 'center', color: temaActual.text, opacity: 0.6, fontSize: '10px', fontWeight: '800' }}>
           UNI CORE — v{APP_VERSION}
         </footer>
       </div>

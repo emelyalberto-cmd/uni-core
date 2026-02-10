@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import { LogOut, Settings, Check, Trash2, Globe, Clock, Calendar, AlertCircle, BookOpen, Palette, Type, Menu, X } from 'lucide-react';
+import { LogOut, Settings, Check, Globe, Clock, Calendar, AlertCircle, BookOpen, Menu, X } from 'lucide-react';
 import { supabase } from './supabaseClient';
 import Login from './components/Login';
 import Horario from './components/Horario';
@@ -9,8 +9,7 @@ import Tareas from './components/Tareas';
 import Pomodoro from './components/Pomodoro';
 import Recursos from './components/Recursos';
 
-// v0.0.4: Eliminación total de Hardcode + Inyección de Temas a Subcomponentes
-const APP_VERSION = "0.0.4";
+const APP_VERSION = "0.0.4.1";
 
 const TEMAS = {
   classic: { bg: '#f8fafc', accent: '#2563eb', card: '#ffffff', text: '#0f172a', nav: 'rgba(255,255,255,0.7)', secondary: '#64748b' },
@@ -51,9 +50,13 @@ const Home = ({ perfil, tareas, parciales, asignaturas, tema, isMobile }) => {
 
   const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
   const hoyNombre = diasSemana[ahora.getDay()];
-  const clasesHoy = asignaturas.filter(a => a.dia === hoyNombre).sort((a, b) => a.hora_inicio.localeCompare(b.hora_inicio));
+  
+  const clasesHoy = asignaturas
+    .filter(a => a.dia === hoyNombre)
+    .sort((a, b) => (a.hora_inicio || "").localeCompare(b.hora_inicio || ""));
 
   const obtenerProgresoClase = (inicio, fin) => {
+    if (!inicio || !fin) return 0;
     const [hI, mI] = inicio.split(':').map(Number);
     const [hF, mF] = fin.split(':').map(Number);
     const dInicio = new Date(ahora); dInicio.setHours(hI, mI, 0);
@@ -69,6 +72,7 @@ const Home = ({ perfil, tareas, parciales, asignaturas, tema, isMobile }) => {
   });
 
   const siguienteClase = clasesHoy.find(c => {
+    if (!c.hora_inicio) return false;
     const [hI, mI] = c.hora_inicio.split(':').map(Number);
     const dInicio = new Date(ahora); dInicio.setHours(hI, mI, 0);
     return ahora < dInicio;
@@ -171,9 +175,10 @@ function App() {
   const [asignaturas, setAsignaturas] = useState([]);
   const [menuOpen, setMenuOpen] = useState(false);
 
+  // INICIALIZACIÓN CON PERSISTENCIA LOCAL 🏠
   const [perfil, setPerfil] = useState(() => {
     const saved = localStorage.getItem('unicore_prefs');
-    return saved ? JSON.parse(saved) : { tema: 'classic', fuente: 'sans' };
+    return saved ? JSON.parse(saved) : { tema: 'classic', fuente: 'sans', nombre_preferido: '' };
   });
 
   const temaActual = TEMAS[perfil?.tema] || TEMAS.classic;
@@ -182,14 +187,14 @@ function App() {
   const cargarTodo = async (userId) => {
     const { data: pData } = await supabase.from('perfiles').select('*').eq('id', userId).single();
     
+    // FUSIÓN INTELIGENTE: Prioridad al Tema Local + Datos Nube ☁️
     if (pData) {
-      setPerfil(prev => ({
-        ...pData,
-        tema: prev.tema, 
-        fuente: prev.fuente
-      }));
+      setPerfil(prev => {
+        const nuevo = { ...pData, tema: prev.tema, fuente: prev.fuente };
+        localStorage.setItem('unicore_prefs', JSON.stringify(nuevo));
+        return nuevo;
+      });
       setEditNombre(pData.nombre_preferido || '');
-      localStorage.setItem('unicore_prefs', JSON.stringify(pData));
     }
 
     const [tRes, pRes, aRes] = await Promise.all([

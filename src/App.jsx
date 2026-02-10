@@ -9,8 +9,9 @@ import Tareas from './components/Tareas';
 import Pomodoro from './components/Pomodoro';
 import Recursos from './components/Recursos';
 
-const APP_VERSION = "0.0.4.1";
+const APP_VERSION = "0.0.4.2";
 
+// ... (Mantenemos TEMAS y FUENTES igual)
 const TEMAS = {
   classic: { bg: '#f8fafc', accent: '#2563eb', card: '#ffffff', text: '#0f172a', nav: 'rgba(255,255,255,0.7)', secondary: '#64748b' },
   anochecer: { bg: '#0f172a', accent: '#818cf8', card: '#1e293b', text: '#f1f5f9', nav: 'rgba(15, 23, 42, 0.8)', secondary: '#94a3b8' },
@@ -40,7 +41,7 @@ function useIsMobile() {
   return isMobile;
 }
 
-const Home = ({ perfil, tareas, parciales, asignaturas, tema, isMobile }) => {
+const Home = ({ perfil, tareas, parciales, asignaturas, tema, isMobile, setTareas }) => {
   const [ahora, setAhora] = useState(new Date());
 
   useEffect(() => {
@@ -48,12 +49,18 @@ const Home = ({ perfil, tareas, parciales, asignaturas, tema, isMobile }) => {
     return () => clearInterval(timer);
   }, []);
 
+  const hoyISO = ahora.toISOString().split('T')[0];
   const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
   const hoyNombre = diasSemana[ahora.getDay()];
   
   const clasesHoy = asignaturas
     .filter(a => a.dia === hoyNombre)
     .sort((a, b) => (a.hora_inicio || "").localeCompare(b.hora_inicio || ""));
+
+  const completarTarea = async (id) => {
+    const { error } = await supabase.from('tareas').update({ completada: true }).eq('id', id);
+    if (!error) setTareas(prev => prev.map(t => t.id === id ? { ...t, completada: true } : t));
+  };
 
   const obtenerProgresoClase = (inicio, fin) => {
     if (!inicio || !fin) return 0;
@@ -78,7 +85,12 @@ const Home = ({ perfil, tareas, parciales, asignaturas, tema, isMobile }) => {
     return ahora < dInicio;
   });
 
-  const urgentes = tareas.filter(t => !t.completada).sort((a, b) => new Date(a.fecha_entrega) - new Date(b.fecha_entrega)).slice(0, 2);
+  // Filtramos solo las NO completadas
+  const urgentes = tareas
+    .filter(t => !t.completada)
+    .sort((a, b) => new Date(a.fecha_entrega) - new Date(b.fecha_entrega))
+    .slice(0, 3);
+
   const proximosParciales = parciales.sort((a, b) => new Date(a.fecha) - new Date(b.fecha)).slice(0, 2);
 
   const cardStyle = { 
@@ -89,6 +101,15 @@ const Home = ({ perfil, tareas, parciales, asignaturas, tema, isMobile }) => {
 
   return (
     <div style={{ padding: isMobile ? '20px 15px' : '40px 20px', maxWidth: '1200px', margin: '0 auto' }}>
+      {/* ... (Estilos de Clase Actual igual) */}
+      <style>{`
+        @keyframes pulse-red {
+          0% { border-color: #ef4444; box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+          70% { border-color: #ef4444; box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+          100% { border-color: #ef4444; box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+      `}</style>
+
       <div style={{ marginBottom: isMobile ? '25px' : '40px' }}>
         {claseActual ? (
           <div style={{ background: tema.accent + '20', padding: isMobile ? '20px' : '30px', borderRadius: '35px', border: `1px solid ${tema.accent}50` }}>
@@ -121,10 +142,44 @@ const Home = ({ perfil, tareas, parciales, asignaturas, tema, isMobile }) => {
       </header>
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+        
+        {/* PANEL DE TAREAS MEJORADO ✅ */}
+        <div style={cardStyle}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', color: tema.accent }}>
+            <AlertCircle size={20}/>
+            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '900', textTransform: 'uppercase' }}>Pendientes Críticos</h3>
+          </div>
+          {urgentes.length > 0 ? urgentes.map((t, i) => {
+            const esHoy = t.fecha_entrega === hoyISO;
+            return (
+              <div key={i} style={{ 
+                padding: '15px', 
+                background: esHoy ? '#ef444415' : `${tema.accent}10`, 
+                borderRadius: '20px', 
+                marginBottom: '10px', 
+                border: `1px solid ${esHoy ? '#ef4444' : tema.accent + '20'}`,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                animation: esHoy ? 'pulse-red 2s infinite' : 'none'
+              }}>
+                <div>
+                  <div style={{ fontWeight: '800', fontSize: '14px', color: esHoy ? '#ef4444' : tema.text }}>{t.titulo}</div>
+                  <div style={{ fontSize: '10px', opacity: 0.7 }}>{esHoy ? '⚠️ ENTREGA HOY' : `Vence: ${new Date(t.fecha_entrega).toLocaleDateString()}`}</div>
+                </div>
+                <button onClick={() => completarTarea(t.id)} style={{ background: esHoy ? '#ef4444' : tema.accent, color: 'white', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <Check size={18} />
+                </button>
+              </div>
+            );
+          }) : <p style={{ color: tema.text, opacity: 0.6, fontSize: '13px' }}>¡Todo listo!</p>}
+        </div>
+
+        {/* ... (Secciones de Horario y Exámenes igual) */}
         <div style={cardStyle}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', color: tema.accent }}>
             <BookOpen size={20}/>
-            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '900', textTransform: 'uppercase' }}>Horario</h3>
+            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '900', textTransform: 'uppercase' }}>Horario hoy</h3>
           </div>
           {clasesHoy.length > 0 ? clasesHoy.map((c, i) => (
             <div key={i} style={{ padding: '12px', background: tema.accent + '15', borderRadius: '15px', marginBottom: '8px' }}>
@@ -132,19 +187,6 @@ const Home = ({ perfil, tareas, parciales, asignaturas, tema, isMobile }) => {
               <div style={{ fontSize: '11px', color: tema.text, opacity: 0.7, fontWeight: '600' }}>{c.hora_inicio} — {c.hora_fin}</div>
             </div>
           )) : <p style={{ color: tema.text, opacity: 0.6, fontSize: '13px' }}>Día libre.</p>}
-        </div>
-
-        <div style={{ ...cardStyle, background: tema.card, border: `1px solid ${tema.accent}50` }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', color: tema.accent }}>
-            <AlertCircle size={20}/>
-            <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '900', textTransform: 'uppercase' }}>Pendientes</h3>
-          </div>
-          {urgentes.map((t, i) => (
-            <div key={i} style={{ padding: '12px', background: tema.accent + '10', borderRadius: '15px', marginBottom: '8px', border: `1px solid ${tema.accent}20` }}>
-              <div style={{ fontWeight: '700', fontSize: '14px', color: tema.text }}>{t.titulo}</div>
-              <div style={{ fontSize: '10px', color: tema.text, opacity: 0.6 }}>{new Date(t.fecha_entrega).toLocaleDateString()}</div>
-            </div>
-          ))}
         </div>
 
         <div style={cardStyle}>
@@ -159,6 +201,7 @@ const Home = ({ perfil, tareas, parciales, asignaturas, tema, isMobile }) => {
             </div>
           ))}
         </div>
+
       </div>
     </div>
   );
@@ -175,7 +218,6 @@ function App() {
   const [asignaturas, setAsignaturas] = useState([]);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // INICIALIZACIÓN CON PERSISTENCIA LOCAL 🏠
   const [perfil, setPerfil] = useState(() => {
     const saved = localStorage.getItem('unicore_prefs');
     return saved ? JSON.parse(saved) : { tema: 'classic', fuente: 'sans', nombre_preferido: '' };
@@ -186,8 +228,6 @@ function App() {
 
   const cargarTodo = async (userId) => {
     const { data: pData } = await supabase.from('perfiles').select('*').eq('id', userId).single();
-    
-    // FUSIÓN INTELIGENTE: Prioridad al Tema Local + Datos Nube ☁️
     if (pData) {
       setPerfil(prev => {
         const nuevo = { ...pData, tema: prev.tema, fuente: prev.fuente };
@@ -196,13 +236,11 @@ function App() {
       });
       setEditNombre(pData.nombre_preferido || '');
     }
-
     const [tRes, pRes, aRes] = await Promise.all([
       supabase.from('tareas').select('*').eq('user_id', userId),
       supabase.from('parciales').select('*').eq('user_id', userId),
       supabase.from('asignaturas').select('*').eq('user_id', userId)
     ]);
-    
     if (tRes.data) setTareas(tRes.data);
     if (pRes.data) setParciales(pRes.data);
     if (aRes.data) setAsignaturas(aRes.data);
@@ -250,6 +288,7 @@ function App() {
     <Router>
       <div style={{ minHeight: '100vh', backgroundColor: temaActual.bg, color: temaActual.text, fontFamily: fuenteActual, transition: 'all 0.4s ease' }}>
         
+        {/* NAV ... igual */}
         <nav style={{ 
           position: 'fixed', top: isMobile ? '10px' : '30px', left: '50%', transform: 'translateX(-50%)',
           width: isMobile ? '92%' : '95%', maxWidth: '1200px', backgroundColor: temaActual.nav,
@@ -328,7 +367,8 @@ function App() {
 
         <main style={{ flex: 1, paddingTop: isMobile ? '100px' : '160px' }}>
           <Routes>
-            <Route path="/" element={<Home perfil={perfil} tareas={tareas} parciales={parciales} asignaturas={asignaturas} tema={temaActual} isMobile={isMobile} />} />
+            {/* PASAMOS SETTAREAS AL HOME ✅ */}
+            <Route path="/" element={<Home perfil={perfil} tareas={tareas} parciales={parciales} asignaturas={asignaturas} tema={temaActual} isMobile={isMobile} setTareas={setTareas} />} />
             <Route path="/horario" element={<Horario tema={temaActual} isMobile={isMobile} />} />
             <Route path="/tareas" element={<Tareas tema={temaActual} isMobile={isMobile} />} />
             <Route path="/finanzas" element={<Finanzas tema={temaActual} isMobile={isMobile} />} />

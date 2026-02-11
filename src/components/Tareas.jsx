@@ -27,32 +27,71 @@ const TareasSeccion = ({ tema, isMobile }) => {
     if (m) setMaterias(m);
   };
 
+  // FUNCIÓN VISUAL ANTI-DESFASE PARA LAS LISTAS 🛡️
+  const formatearFechaVista = (fechaRaw) => {
+    if (!fechaRaw) return "";
+    const limpia = fechaRaw.split('T')[0];
+    const [y, m, d] = limpia.split('-');
+    return `${d}/${m}/${y}`;
+  };
+
   const addTarea = async (e) => {
     e.preventDefault();
-    const { data: { user } } = await supabase.auth.getUser();
-    const { error } = await supabase.from('tareas').insert([{ ...nuevaTarea, user_id: user.id }]);
-    if (!error) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // FORZAMOS MEDIODÍA AL GUARDAR PARA EVITAR EL ERROR DEL DÍA ANTERIOR 🛠️
+      const fechaCorregida = nuevaTarea.fecha_entrega + "T12:00:00";
+
+      const { error } = await supabase.from('tareas').insert([{ 
+        titulo: nuevaTarea.titulo, 
+        fecha_entrega: fechaCorregida, 
+        materia_id: nuevaTarea.materia_id, 
+        user_id: user.id 
+      }]);
+
+      if (error) throw error;
+
       setNuevaTarea({ titulo: '', fecha_entrega: '', materia_id: '' });
       setFormTarea(false);
       fetchDatos();
+    } catch (err) {
+      alert("Error al guardar tarea: " + err.message);
     }
   };
 
   const addParcial = async (e) => {
     e.preventDefault();
-    const { data: { user } } = await supabase.auth.getUser();
-    const { error } = await supabase.from('parciales').insert([{ ...nuevoParcial, user_id: user.id }]);
-    if (!error) {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // FORZAMOS MEDIODÍA TAMBIÉN EN PARCIALES 🛠️
+      const fechaCorregida = nuevoParcial.fecha_examen + "T12:00:00";
+
+      const { error } = await supabase.from('parciales').insert([{ 
+        fecha_examen: fechaCorregida, 
+        notas_estudio: nuevoParcial.notas_estudio, 
+        materia_id: nuevoParcial.materia_id, 
+        user_id: user.id 
+      }]);
+
+      if (error) throw error;
+
       setNuevoParcial({ fecha_examen: '', notas_estudio: '', materia_id: '' });
       setFormParcial(false);
       fetchDatos();
+    } catch (err) {
+      alert("Error al guardar parcial: " + err.message);
     }
   };
 
-  // ESTILOS DINÁMICOS BASADOS EN EL TEMA
+  const eliminarDato = async (tabla, id) => {
+    const { error } = await supabase.from(tabla).delete().eq('id', id);
+    if (!error) fetchDatos();
+  };
+
   const glassStyle = { 
     background: tema.card, 
-    backdropFilter: 'blur(20px)', 
     border: `1px solid ${tema.accent}30`, 
     borderRadius: '35px', 
     padding: '30px', 
@@ -69,12 +108,13 @@ const TareasSeccion = ({ tema, isMobile }) => {
     outline: 'none', 
     background: tema.bg, 
     color: tema.text,
-    fontSize: '14px'
+    fontSize: '14px',
+    boxSizing: 'border-box'
   };
 
   return (
-    <div style={{ maxWidth: '1100px', margin: '0 auto', padding: isMobile ? '20px 15px' : '40px 20px', textAlign: 'center' }}>
-      <header style={{ marginBottom: '40px' }}>
+    <div style={{ maxWidth: '1100px', margin: '0 auto', padding: isMobile ? '20px 15px' : '40px 20px' }}>
+      <header style={{ textAlign: 'center', marginBottom: '40px' }}>
         <h2 style={{ fontSize: isMobile ? '32px' : '42px', fontWeight: '900', color: tema.text, letterSpacing: '-2px' }}>
           Gestión de <span style={{ color: tema.accent }}>Pendientes</span>
         </h2>
@@ -106,10 +146,10 @@ const TareasSeccion = ({ tema, isMobile }) => {
         </div>
       </header>
 
-      {/* FORMULARIO TAREA */}
+      {/* FORMULARIOS */}
       <div style={{ maxHeight: formTarea ? '600px' : '0', overflow: 'hidden', transition: 'all 0.4s ease', opacity: formTarea ? 1 : 0 }}>
         <div style={{ ...glassStyle, maxWidth: '500px', margin: '0 auto 40px auto' }}>
-          <h3 style={{ fontSize: '18px', fontWeight: '900', marginBottom: '20px', color: tema.text }}>Registrar Tarea</h3>
+          <h3 style={{ fontSize: '18px', fontWeight: '900', marginBottom: '20px' }}>Registrar Tarea</h3>
           <form onSubmit={addTarea}>
             <input style={inputStyle} placeholder="¿Qué hay que hacer?" value={nuevaTarea.titulo} onChange={e => setNuevaTarea({...nuevaTarea, titulo: e.target.value})} required />
             <input style={inputStyle} type="date" value={nuevaTarea.fecha_entrega} onChange={e => setNuevaTarea({...nuevaTarea, fecha_entrega: e.target.value})} required />
@@ -117,12 +157,11 @@ const TareasSeccion = ({ tema, isMobile }) => {
               <option value="">Selecciona Materia</option>
               {materias.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}
             </select>
-            <button type="submit" style={{ width: '100%', padding: '12px', background: tema.accent, color: tema.bg, borderRadius: '12px', fontWeight: '800', border: 'none', marginTop: '10px', cursor: 'pointer' }}>GUARDAR TAREA</button>
+            <button type="submit" style={{ width: '100%', padding: '14px', background: tema.accent, color: tema.bg, borderRadius: '15px', fontWeight: '900', border: 'none', cursor: 'pointer' }}>GUARDAR TAREA</button>
           </form>
         </div>
       </div>
 
-      {/* FORMULARIO PARCIAL */}
       <div style={{ maxHeight: formParcial ? '600px' : '0', overflow: 'hidden', transition: 'all 0.4s ease', opacity: formParcial ? 1 : 0 }}>
         <div style={{ ...glassStyle, maxWidth: '500px', margin: '0 auto 40px auto', border: '1px solid #f8717150' }}>
           <h3 style={{ fontSize: '18px', fontWeight: '900', marginBottom: '20px', color: '#f87171' }}>Registrar Examen</h3>
@@ -133,29 +172,31 @@ const TareasSeccion = ({ tema, isMobile }) => {
               <option value="">¿Para qué materia?</option>
               {materias.map(m => <option key={m.id} value={m.id}>{m.nombre}</option>)}
             </select>
-            <button type="submit" style={{ width: '100%', padding: '12px', background: '#f87171', color: tema.bg, borderRadius: '12px', fontWeight: '800', border: 'none', marginTop: '10px', cursor: 'pointer' }}>GUARDAR PARCIAL</button>
+            <button type="submit" style={{ width: '100%', padding: '14px', background: '#f87171', color: tema.bg, borderRadius: '15px', fontWeight: '900', border: 'none', cursor: 'pointer' }}>GUARDAR PARCIAL</button>
           </form>
         </div>
       </div>
 
-      {/* LISTADO DE PENDIENTES */}
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(450px, 1fr))', gap: '30px', textAlign: 'left' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(450px, 1fr))', gap: '30px' }}>
         {/* COLUMNA TAREAS */}
         <section>
-          <h3 style={{ fontSize: '14px', fontWeight: '900', color: tema.accent, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px', opacity: 0.8 }}>
+          <h3 style={{ fontSize: '14px', fontWeight: '900', color: tema.accent, marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <CheckCircle size={18}/> TAREAS ACTIVAS
           </h3>
-          {tareas.map(t => (
+          {tareas.filter(t => !t.completada).map(t => (
             <div key={t.id} style={{ ...glassStyle, padding: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-              <div>
+              <div style={{ flex: 1 }}>
                 <span style={{ fontSize: '10px', fontWeight: '900', color: tema.bg, background: tema.accent, padding: '4px 10px', borderRadius: '10px' }}>
-                  {t.asignaturas?.nombre}
+                  {t.asignaturas?.nombre || 'General'}
                 </span>
-                <h4 style={{ margin: '10px 0 5px 0', fontSize: '16px', fontWeight: '800', color: tema.text }}>{t.titulo}</h4>
-                <div style={{ fontSize: '12px', color: tema.text, opacity: 0.6, display: 'flex', alignItems: 'center', gap: '5px' }}>
-                  <Clock size={12}/> {t.fecha_entrega}
+                <h4 style={{ margin: '10px 0 5px 0', fontSize: '16px', fontWeight: '800' }}>{t.titulo}</h4>
+                <div style={{ fontSize: '12px', opacity: 0.6, display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <Clock size={12}/> {formatearFechaVista(t.fecha_entrega)}
                 </div>
               </div>
+              <button onClick={() => eliminarDato('tareas', t.id)} style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '10px' }}>
+                <Trash2 size={18}/>
+              </button>
             </div>
           ))}
         </section>
@@ -166,15 +207,20 @@ const TareasSeccion = ({ tema, isMobile }) => {
             <Sparkles size={18}/> PRÓXIMOS EXÁMENES
           </h3>
           {parciales.map(p => (
-            <div key={p.id} style={{ ...glassStyle, padding: '20px', borderLeft: '5px solid #f87171', marginBottom: '15px' }}>
-              <span style={{ fontSize: '10px', fontWeight: '900', color: '#f87171', background: '#f8717120', padding: '4px 10px', borderRadius: '10px' }}>
-                {p.asignaturas?.nombre}
-              </span>
-              <h4 style={{ margin: '10px 0 5px 0', fontSize: '16px', fontWeight: '800', color: tema.text }}>Examen Parcial</h4>
-              <p style={{ fontSize: '12px', color: tema.text, opacity: 0.7, margin: '5px 0' }}>{p.notas_estudio}</p>
-              <div style={{ fontSize: '12px', color: '#f87171', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <Calendar size={12}/> {p.fecha_examen}
+            <div key={p.id} style={{ ...glassStyle, padding: '20px', borderLeft: '5px solid #f87171', marginBottom: '15px', display: 'flex', justifyContent: 'space-between' }}>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: '10px', fontWeight: '900', color: '#f87171', background: '#f8717120', padding: '4px 10px', borderRadius: '10px' }}>
+                  {p.asignaturas?.nombre || 'General'}
+                </span>
+                <h4 style={{ margin: '10px 0 5px 0', fontSize: '16px', fontWeight: '800' }}>Examen Parcial</h4>
+                <p style={{ fontSize: '12px', opacity: 0.7, margin: '5px 0' }}>{p.notas_estudio}</p>
+                <div style={{ fontSize: '12px', color: '#f87171', fontWeight: '800', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <Calendar size={12}/> {formatearFechaVista(p.fecha_examen)}
+                </div>
               </div>
+              <button onClick={() => eliminarDato('parciales', p.id)} style={{ background: 'none', border: 'none', color: '#f87171', opacity: 0.5, cursor: 'pointer', height: 'fit-content' }}>
+                <Trash2 size={18}/>
+              </button>
             </div>
           ))}
         </section>

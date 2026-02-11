@@ -9,7 +9,7 @@ import Tareas from './components/Tareas';
 import Pomodoro from './components/Pomodoro';
 import Recursos from './components/Recursos';
 
-const APP_VERSION = "0.0.4.2";
+const APP_VERSION = "0.0.5.2";
 
 // ... (Mantenemos TEMAS y FUENTES igual)
 const TEMAS = {
@@ -49,9 +49,30 @@ const Home = ({ perfil, tareas, parciales, asignaturas, tema, isMobile, setTarea
     return () => clearInterval(timer);
   }, []);
 
-  const hoyISO = ahora.toISOString().split('T')[0];
-  const diasSemana = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-  const hoyNombre = diasSemana[ahora.getDay()];
+  // 1. OBTENEMOS HOY EN FORMATO YYYY-MM-DD SIN INTERPRETACIONES 🇩🇴
+  const hoyString = ahora.getFullYear() + '-' + 
+                    String(ahora.getMonth() + 1).padStart(2, '0') + '-' + 
+                    String(ahora.getDate()).padStart(2, '0');
+
+  // 2. FUNCIÓN DE RENDERIZADO "ANTI-RESTO" 🛡️
+  const formatearSeguro = (fechaString) => {
+    if (!fechaString) return "Sin fecha";
+    
+    // Forzamos la creación del objeto fecha pero le sumamos 12 horas 
+    // para que cualquier desfase de zona horaria no logre cambiar el día.
+    const date = new Date(fechaString + 'T12:00:00');
+    
+    // Si la fecha sigue siendo inválida por alguna razón, usamos regex
+    if (isNaN(date.getTime())) {
+        const partes = fechaString.split('T')[0].split('-');
+        return `${partes[2]} / ${partes[1]}`;
+    }
+
+    const meses = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    return `${date.getDate()} ${meses[date.getMonth()]}`;
+  };
+
+  const hoyNombre = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][ahora.getDay()];
   
   const clasesHoy = asignaturas
     .filter(a => a.dia === hoyNombre)
@@ -62,36 +83,14 @@ const Home = ({ perfil, tareas, parciales, asignaturas, tema, isMobile, setTarea
     if (!error) setTareas(prev => prev.map(t => t.id === id ? { ...t, completada: true } : t));
   };
 
-  const obtenerProgresoClase = (inicio, fin) => {
-    if (!inicio || !fin) return 0;
-    const [hI, mI] = inicio.split(':').map(Number);
-    const [hF, mF] = fin.split(':').map(Number);
-    const dInicio = new Date(ahora); dInicio.setHours(hI, mI, 0);
-    const dFin = new Date(ahora); dFin.setHours(hF, mF, 0);
-    if (ahora < dInicio) return 0;
-    if (ahora > dFin) return 100;
-    return Math.round(((ahora - dInicio) / (dFin - dInicio)) * 100);
-  };
-
-  const claseActual = clasesHoy.find(c => {
-    const p = obtenerProgresoClase(c.hora_inicio, c.hora_fin);
-    return p > 0 && p < 100;
-  });
-
-  const siguienteClase = clasesHoy.find(c => {
-    if (!c.hora_inicio) return false;
-    const [hI, mI] = c.hora_inicio.split(':').map(Number);
-    const dInicio = new Date(ahora); dInicio.setHours(hI, mI, 0);
-    return ahora < dInicio;
-  });
-
-  // Filtramos solo las NO completadas
   const urgentes = tareas
     .filter(t => !t.completada)
-    .sort((a, b) => new Date(a.fecha_entrega) - new Date(b.fecha_entrega))
+    .sort((a, b) => (a.fecha_entrega || "").localeCompare(b.fecha_entrega || ""))
     .slice(0, 3);
 
-  const proximosParciales = parciales.sort((a, b) => new Date(a.fecha) - new Date(b.fecha)).slice(0, 2);
+  const proximosParciales = parciales
+    .sort((a, b) => (a.fecha_examen || "").localeCompare(b.fecha_examen || ""))
+    .slice(0, 2);
 
   const cardStyle = { 
     background: tema.card, padding: isMobile ? '20px' : '30px', borderRadius: '30px', 
@@ -101,7 +100,6 @@ const Home = ({ perfil, tareas, parciales, asignaturas, tema, isMobile, setTarea
 
   return (
     <div style={{ padding: isMobile ? '20px 15px' : '40px 20px', maxWidth: '1200px', margin: '0 auto' }}>
-      {/* ... (Estilos de Clase Actual igual) */}
       <style>{`
         @keyframes pulse-red {
           0% { border-color: #ef4444; box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
@@ -110,31 +108,6 @@ const Home = ({ perfil, tareas, parciales, asignaturas, tema, isMobile, setTarea
         }
       `}</style>
 
-      <div style={{ marginBottom: isMobile ? '25px' : '40px' }}>
-        {claseActual ? (
-          <div style={{ background: tema.accent + '20', padding: isMobile ? '20px' : '30px', borderRadius: '35px', border: `1px solid ${tema.accent}50` }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '15px' }}>
-              <div>
-                <span style={{ fontSize: '10px', fontWeight: '900', color: tema.bg, background: tema.accent, padding: '4px 10px', borderRadius: '8px', textTransform: 'uppercase' }}>En curso</span>
-                <h2 style={{ fontSize: isMobile ? '20px' : '28px', fontWeight: '900', color: tema.text, margin: '8px 0 4px 0' }}>{claseActual.nombre}</h2>
-                <p style={{ margin: 0, fontSize: '13px', color: tema.text, opacity: 0.8, fontWeight: '700' }}>Aula {claseActual.aula} • Termina {claseActual.hora_fin}</p>
-              </div>
-              <div style={{ fontSize: isMobile ? '24px' : '32px', fontWeight: '900', color: tema.accent }}>{obtenerProgresoClase(claseActual.hora_inicio, claseActual.hora_fin)}%</div>
-            </div>
-            <div style={{ width: '100%', background: tema.accent + '30', height: '10px', borderRadius: '20px', overflow: 'hidden' }}>
-              <div style={{ width: `${obtenerProgresoClase(claseActual.hora_inicio, claseActual.hora_fin)}%`, background: tema.accent, height: '100%', borderRadius: '20px', transition: 'width 1s ease' }}></div>
-            </div>
-          </div>
-        ) : (
-          <div style={{ background: tema.card, padding: '15px 25px', borderRadius: '25px', border: `1px solid ${tema.accent}40`, display: 'flex', alignItems: 'center', gap: '12px' }}>
-              <Clock size={18} color={tema.accent}/>
-              <span style={{ fontSize: '14px', fontWeight: '700', color: tema.text }}>
-                 {siguienteClase ? `Siguiente: ${siguienteClase.nombre} a las ${siguienteClase.hora_inicio}` : 'No hay más clases por hoy'}
-              </span>
-          </div>
-        )}
-      </div>
-
       <header style={{ marginBottom: isMobile ? '30px' : '50px' }}>
         <h1 style={{ fontSize: isMobile ? '32px' : '48px', fontWeight: '900', color: tema.text, margin: 0, letterSpacing: '-1.5px' }}>
           Hola, <span style={{ color: tema.accent }}>{perfil?.nombre_preferido || 'Estudiante'}</span>
@@ -142,15 +115,14 @@ const Home = ({ perfil, tareas, parciales, asignaturas, tema, isMobile, setTarea
       </header>
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
-        
-        {/* PANEL DE TAREAS MEJORADO ✅ */}
         <div style={cardStyle}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', color: tema.accent }}>
             <AlertCircle size={20}/>
             <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '900', textTransform: 'uppercase' }}>Pendientes Críticos</h3>
           </div>
           {urgentes.length > 0 ? urgentes.map((t, i) => {
-            const esHoy = t.fecha_entrega === hoyISO;
+            const tFecha = (t.fecha_entrega || "").split('T')[0];
+            const esHoy = tFecha === hoyString;
             return (
               <div key={i} style={{ 
                 padding: '15px', 
@@ -158,14 +130,12 @@ const Home = ({ perfil, tareas, parciales, asignaturas, tema, isMobile, setTarea
                 borderRadius: '20px', 
                 marginBottom: '10px', 
                 border: `1px solid ${esHoy ? '#ef4444' : tema.accent + '20'}`,
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                 animation: esHoy ? 'pulse-red 2s infinite' : 'none'
               }}>
                 <div>
                   <div style={{ fontWeight: '800', fontSize: '14px', color: esHoy ? '#ef4444' : tema.text }}>{t.titulo}</div>
-                  <div style={{ fontSize: '10px', opacity: 0.7 }}>{esHoy ? '⚠️ ENTREGA HOY' : `Vence: ${new Date(t.fecha_entrega).toLocaleDateString()}`}</div>
+                  <div style={{ fontSize: '10px', opacity: 0.7 }}>{esHoy ? '⚠️ ENTREGA HOY' : `Vence: ${formatearSeguro(t.fecha_entrega)}`}</div>
                 </div>
                 <button onClick={() => completarTarea(t.id)} style={{ background: esHoy ? '#ef4444' : tema.accent, color: 'white', border: 'none', borderRadius: '50%', width: '32px', height: '32px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <Check size={18} />
@@ -175,7 +145,6 @@ const Home = ({ perfil, tareas, parciales, asignaturas, tema, isMobile, setTarea
           }) : <p style={{ color: tema.text, opacity: 0.6, fontSize: '13px' }}>¡Todo listo!</p>}
         </div>
 
-        {/* ... (Secciones de Horario y Exámenes igual) */}
         <div style={cardStyle}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '20px', color: tema.accent }}>
             <BookOpen size={20}/>
@@ -196,12 +165,11 @@ const Home = ({ perfil, tareas, parciales, asignaturas, tema, isMobile, setTarea
           </div>
           {proximosParciales.map((p, i) => (
             <div key={i} style={{ padding: '12px', background: tema.accent + '10', borderRadius: '15px', marginBottom: '8px', border: `1px solid ${tema.accent}20`, color: tema.text }}>
-              <div style={{ fontWeight: '800', fontSize: '14px' }}>{p.materia}</div>
-              <div style={{ fontSize: '11px', opacity: 0.8 }}>{new Date(p.fecha).toLocaleDateString()}</div>
+              <div style={{ fontWeight: '800', fontSize: '14px' }}>{p.asignaturas?.nombre || 'Examen'}</div>
+              <div style={{ fontSize: '11px', opacity: 0.8 }}>{formatearSeguro(p.fecha_examen)}</div>
             </div>
           ))}
         </div>
-
       </div>
     </div>
   );
@@ -229,16 +197,12 @@ function App() {
   const cargarTodo = async (userId) => {
     const { data: pData } = await supabase.from('perfiles').select('*').eq('id', userId).single();
     if (pData) {
-      setPerfil(prev => {
-        const nuevo = { ...pData, tema: prev.tema, fuente: prev.fuente };
-        localStorage.setItem('unicore_prefs', JSON.stringify(nuevo));
-        return nuevo;
-      });
+      setPerfil(prev => ({ ...pData, tema: prev.tema, fuente: prev.fuente }));
       setEditNombre(pData.nombre_preferido || '');
     }
     const [tRes, pRes, aRes] = await Promise.all([
-      supabase.from('tareas').select('*').eq('user_id', userId),
-      supabase.from('parciales').select('*').eq('user_id', userId),
+      supabase.from('tareas').select('*, asignaturas(nombre)').eq('user_id', userId),
+      supabase.from('parciales').select('*, asignaturas(nombre)').eq('user_id', userId),
       supabase.from('asignaturas').select('*').eq('user_id', userId)
     ]);
     if (tRes.data) setTareas(tRes.data);
@@ -288,7 +252,6 @@ function App() {
     <Router>
       <div style={{ minHeight: '100vh', backgroundColor: temaActual.bg, color: temaActual.text, fontFamily: fuenteActual, transition: 'all 0.4s ease' }}>
         
-        {/* NAV ... igual */}
         <nav style={{ 
           position: 'fixed', top: isMobile ? '10px' : '30px', left: '50%', transform: 'translateX(-50%)',
           width: isMobile ? '92%' : '95%', maxWidth: '1200px', backgroundColor: temaActual.nav,
@@ -367,7 +330,6 @@ function App() {
 
         <main style={{ flex: 1, paddingTop: isMobile ? '100px' : '160px' }}>
           <Routes>
-            {/* PASAMOS SETTAREAS AL HOME ✅ */}
             <Route path="/" element={<Home perfil={perfil} tareas={tareas} parciales={parciales} asignaturas={asignaturas} tema={temaActual} isMobile={isMobile} setTareas={setTareas} />} />
             <Route path="/horario" element={<Horario tema={temaActual} isMobile={isMobile} />} />
             <Route path="/tareas" element={<Tareas tema={temaActual} isMobile={isMobile} />} />
